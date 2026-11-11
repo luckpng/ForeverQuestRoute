@@ -5,6 +5,57 @@ C.records, C.byID, C.dungeons, C.entityZones = {}, {}, {}, {}
 C.logs, C.areaMaps = {}, {}
 C.progress, C.total = 0, 0
 
+-- Portuguese names remain searchable with an ordinary keyboard. Multiple words
+-- are ANDed; punctuation is literal rather than interpreted as a Lua pattern.
+function C:SearchText(value)
+    local text=tostring(value or "")
+    for _,pair in ipairs({{"[ÀÁÂÃÄàáâãä]","a"},{"[ÈÉÊËèéêë]","e"},
+        {"[ÌÍÎÏìíîï]","i"},{"[ÒÓÔÕÖòóôõö]","o"},{"[ÙÚÛÜùúûü]","u"},{"[Çç]","c"}}) do
+        -- Lua byte classes cannot represent UTF-8 codepoints. Replace each
+        -- complete encoded character, preserving unrelated bytes.
+        local chars=pair[1]:sub(2,-2)
+        for char in chars:gmatch("[\194-\244][\128-\191]+") do text=text:gsub(char,pair[2]) end
+    end
+    return string.lower(text)
+end
+
+function C:SearchMatches(q,search,extra)
+    if not search or search=="" or not search:find("%S") then return true end
+    local source=(q.title or "") .. " " .. tostring(q.id or "") .. " " .. (extra or "")
+    if q.searchSource~=source then q.searchSource=source; q.searchNormalized=self:SearchText(source) end
+    if self.searchQuery~=search then self.searchQuery=search; self.searchNormalized=self:SearchText(search) end
+    for word in self.searchNormalized:gmatch("%S+") do
+        if not q.searchNormalized:find(word,1,true) then return false end
+    end
+    return true
+end
+
+function C:MatchesStatus(state,status,q)
+    status=status or "all"
+    if status=="all" then return true end
+    if status=="pending" then return state~="done" end
+    if status=="active" then return state=="active" or state=="turnin" end
+    if status=="available" then return state=="pending" end
+    if status=="favorites" then
+        return A.Tracker and A.Tracker.IsFavorite and A.Tracker:IsFavorite(q.id) or false
+    end
+    return state==status
+end
+
+-- A view is one synchronous calculation. Cache only within that calculation:
+-- a subsequent event, character switch or filter operation always starts fresh.
+function C:BeginView()
+    local enum=self.provider and self.provider.Enum or {}
+    local _,_,raceID=UnitRace("player")
+    local _,class=UnitClass("player")
+    self.viewCache={done={},states={},raceMask=enum.raceMaskById and enum.raceMaskById[raceID],
+        classMask=enum.classKeys and enum.classKeys[class]}
+end
+
+function C:EndView()
+    self.viewCache=nil
+end
+
 local function band(a, b)
     -- Masks may use race bits beyond 32 bits in future clients.
     local result, place = 0, 1
@@ -58,6 +109,9 @@ function C:Start()
     if not zones or type(zones.dungeons) ~= "table" then
         self.message = "QuestieDB sem tabela de dungeons compativel."; return
     end
+    -- A retry must not reuse a partially indexed provider or its derived maps.
+    self.records,self.byID,self.dungeons,self.entityZones={},{},{},{}
+    self.progress,self.total=0,0
     self.provider = db
     self.areaMaps = {}
     for k,v in pairs(mapping(zones.areaIdToUiMapId)) do self.areaMaps[k]=v end
@@ -143,7 +197,7 @@ function C:FindDungeon(q)
 end
 
 function C:AddRecord(id)
-    if self.byID[id] then return end
+    if type(id)~="number" or id<=0 or id~=math.floor(id) or self.byID[id] then return end
     local entity=self.provider.Quest
     local q={id=id}
     for _,key in ipairs({"name","requiredLevel","questLevel","requiredRaces","requiredClasses",
@@ -164,11 +218,15 @@ function C:AddRecord(id)
 end
 
 function C:MatchesCharacter(q)
-    local enum=self.provider and self.provider.Enum or {}
-    local _,_,raceID=UnitRace("player")
-    local _,class=UnitClass("player")
-    local raceMask=enum.raceMaskById and enum.raceMaskById[raceID]
-    local classMask=enum.classKeys and enum.classKeys[class]
+    local raceMask,classMask
+    if self.viewCache then raceMask,classMask=self.viewCache.raceMask,self.viewCache.classMask
+    else
+        local enum=self.provider and self.provider.Enum or {}
+        local _,_,raceID=UnitRace("player")
+        local _,class=UnitClass("player")
+        raceMask=enum.raceMaskById and enum.raceMaskById[raceID]
+        classMask=enum.classKeys and enum.classKeys[class]
+    end
     if q.requiredRaces and q.requiredRaces~=0 and raceMask and band(q.requiredRaces,raceMask)==0 then return false end
     if q.requiredClasses and q.requiredClasses~=0 and classMask and band(q.requiredClasses,classMask)==0 then return false end
     return true
@@ -176,10 +234,16 @@ end
 
 function C:SyncCharacter()
     local guid=UnitGUID("player")
-    if not guid then return end
-    A.db.characters=A.db.characters or {}
-    A.db.characters[guid]=A.db.characters[guid] or {completed={}}
+    if not guid then
+        -- Login/loading transitions must never display another character's data.
+        self.character,self.completed=nil,nil
+        self.logs={}
+        return
+    end
+    if type(A.db.characters)~="table" then A.db.characters={} end
+    if type(A.db.characters[guid])~="table" then A.db.characters[guid]={completed={}} end
     self.character=A.db.characters[guid]
+    if type(self.character.completed)~="table" then self.character.completed={} end
     local ids=A:Call(C_QuestLog,"GetAllCompletedQuestIDs")
     self.completed=nil
     if type(ids)=="table" then
@@ -197,7 +261,11 @@ end
 function C:Done(id)
     if self.character and self.character.completed[id] then return true end
     if self.completed then return self.completed[id] or false end
-    return A:Call(C_QuestLog,"IsQuestFlaggedCompleted",id)
+    local cache=self.viewCache and self.viewCache.done
+    if cache and cache[id]~=nil then return cache[id] end
+    local done=A:Call(C_QuestLog,"IsQuestFlaggedCompleted",id)
+    if cache then cache[id]=done end
+    return done
 end
 
 function C:RequirementMet(id)
@@ -219,7 +287,16 @@ function C:FirstMissing(q)
     end
 end
 
-function C:State(q, level)
+function C:State(q,level)
+    local cache=self.viewCache and self.viewCache.states
+    local saved=cache and cache[q]
+    if saved and saved.level==level then return saved.state,saved.reason end
+    local state,reason=self:ComputeState(q,level)
+    if cache then cache[q]={level=level,state=state,reason=reason} end
+    return state,reason
+end
+
+function C:ComputeState(q, level)
     local log=self.logs[q.id]
     if log then
         if A:Call(C_QuestLog,"IsComplete",q.id) then return "turnin","Pronta para entregar" end
@@ -237,9 +314,9 @@ function C:State(q, level)
     if q.nextQuestInChain and q.nextQuestInChain>0 and (self:Done(q.nextQuestInChain) or self.logs[q.nextQuestInChain]) then
         return "locked","Substituida pela continuacao #" .. q.nextQuestInChain
     end
-    if q.availableUntilCompleted and self:Done(q.availableUntilCompleted) then return "locked","Disponibilidade encerrada" end
-    if q.disabledByQuest and (self:Done(q.disabledByQuest) or self.logs[q.disabledByQuest]) then return "locked","Bloqueada por outra quest" end
-    if q.availableStartingWith and not (self:Done(q.availableStartingWith) or self.logs[q.availableStartingWith]) then
+    if (q.availableUntilCompleted or 0)>0 and self:Done(q.availableUntilCompleted) then return "locked","Disponibilidade encerrada" end
+    if (q.disabledByQuest or 0)>0 and (self:Done(q.disabledByQuest) or self.logs[q.disabledByQuest]) then return "locked","Bloqueada por outra quest" end
+    if (q.availableStartingWith or 0)>0 and not (self:Done(q.availableStartingWith) or self.logs[q.availableStartingWith]) then
         return "locked","Requer iniciar #" .. q.availableStartingWith
     end
     if q.parentQuest and q.parentQuest>0 and not self.logs[q.parentQuest] then return "locked","Requer quest ativa #" .. q.parentQuest end
@@ -270,11 +347,11 @@ function C:IsGroup(q)
 end
 
 function C:Location(q, finish, preferredMap)
-    local by=finish and q.finishedBy or q.startedBy
+    local by=(finish and q.finishedBy or q.startedBy) or {}
     local pieces, point={},nil
     for _,kind in ipairs({{1,"Npc"},{2,"Object"}}) do
         for _,id in ipairs(by[kind[1]] or {}) do
-            local entity=self.provider[kind[2]]
+            local entity=self.provider and self.provider[kind[2]]
             local name=self:Read(entity,id,"name") or (kind[2] .. " #" .. id)
             local spawns=self:Read(entity,id,"spawns") or {}
             local areas={}; for area in pairs(spawns) do areas[#areas+1]=area end
@@ -286,7 +363,8 @@ function C:Location(q, finish, preferredMap)
             local place
             for _,area in ipairs(areas) do
                 for _,xy in ipairs(spawns[area]) do
-                    if xy[1] and xy[2] and xy[1]>=0 and xy[2]>=0 then
+                    if type(xy[1])=="number" and type(xy[2])=="number"
+                        and xy[1]>=0 and xy[1]<=100 and xy[2]>=0 and xy[2]<=100 then
                         local map=self:MapForArea(area)
                         place=string.format("%s (%.1f, %.1f)",A:Call(C_Map,"GetAreaInfo",area) or ("Area #" .. area),xy[1],xy[2])
                         if map and (not point or preferredMap and map==preferredMap and point.mapID~=preferredMap) then
@@ -295,38 +373,38 @@ function C:Location(q, finish, preferredMap)
                         break
                     end
                 end
-                if point then break end
+                if point and (not preferredMap or point.mapID==preferredMap) then break end
             end
             pieces[#pieces+1]=name .. (place and (" - " .. place) or " (local desconhecido)")
-            if #pieces>=3 then break end
+            -- Limit detail text, but continue searching all givers for a point
+            -- on the requested map. The first remote giver is not a local pin.
         end
-        if #pieces>=3 then break end
     end
     for _,id in ipairs(by[3] or {}) do
-        pieces[#pieces+1]="Item: " .. (self:Read(self.provider.Item,id,"name") or ("#" .. id))
+        if #pieces<3 then pieces[#pieces+1]="Item: " .. (self:Read(self.provider and self.provider.Item,id,"name") or ("#" .. id)) end
     end
+    while #pieces>3 do table.remove(pieces) end
     return #pieces>0 and table.concat(pieces,"\n") or "Origem nao informada pela base",point
 end
 
 function C:View(level, filters)
+    self:BeginView()
     local rows,counts={}, {done=0,pending=0,active=0,total=0}
-    local search=string.lower(filters.search or "")
     for _,q in ipairs(self.records) do
         local dungeon=q.dungeonID and self.dungeons[q.dungeonID]
         if (filters.tab~="dungeons" or dungeon)
             and (not filters.dungeonID or q.dungeonID==filters.dungeonID)
             and (not filters.myCharacter or self:MatchesCharacter(q))
+            and (not filters.favoritesOnly or A.Tracker and A.Tracker:IsFavorite(q.id))
             and (not filters.levelOnly or (q.level or level)>=level-A.db.options.maxBelow
                 and (q.level or level)<=level+A.db.options.maxAbove)
-            and (search=="" or string.find(string.lower(q.title .. " " .. (dungeon and dungeon.name or "") .. " " .. q.id),search,1,true)) then
+            and self:SearchMatches(q,filters.search,dungeon and dungeon.name) then
             local state,reason=self:State(q,level)
             counts.total=counts.total+1
             if state=="done" then counts.done=counts.done+1
             elseif state=="active" or state=="turnin" then counts.active=counts.active+1
             else counts.pending=counts.pending+1 end
-            if filters.status=="all" or filters.status=="done" and state=="done"
-                or filters.status=="pending" and state~="done"
-                or filters.status=="active" and (state=="active" or state=="turnin") then
+            if self:MatchesStatus(state,filters.status,q) then
                 rows[#rows+1]={quest=q,state=state,reason=reason,dungeon=dungeon}
             end
         end
@@ -337,12 +415,14 @@ function C:View(level, filters)
         if (a.quest.level or 0)~=(b.quest.level or 0) then return (a.quest.level or 0)<(b.quest.level or 0) end
         return a.quest.id<b.quest.id
     end)
+    self:EndView()
     return rows,counts
 end
 
 function C:Entrance(dungeon)
     local entry=dungeon and dungeon.entrance and dungeon.entrance[1]
-    if not entry then return nil end
+    if not entry or type(entry[2])~="number" or type(entry[3])~="number"
+        or entry[2]<0 or entry[2]>100 or entry[3]<0 or entry[3]>100 then return nil end
     local map=self:MapForArea(entry[1])
     if map then return {mapID=map,x=entry[2]/100,y=entry[3]/100,title="Entrada: " .. dungeon.name} end
 end
@@ -350,6 +430,7 @@ end
 -- Enrich current-map recommendations with unaccepted quests from the global DB.
 function C:Recommendations(context, existing)
     if not self.ready then return existing end
+    self:BeginView()
     local result,seen={},{}
     for _,q in ipairs(existing) do result[#result+1]=q; seen[q.id]=true end
     for _,q in ipairs(self.records) do
@@ -377,5 +458,6 @@ function C:Recommendations(context, existing)
             end
         end
     end
+    self:EndView()
     return result
 end

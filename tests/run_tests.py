@@ -14,10 +14,13 @@ def load(name):
     source = (root / "ForeverQuestRoute" / name).read_text(encoding="utf-8")
     lua.execute(source, "ForeverQuestRoute", addon)
 
-for name in ("Engine.lua", "Adapter.lua", "Catalog.lua", "Requirements.lua", "Area.lua"):
+for name in ("Engine.lua", "Adapter.lua", "Catalog.lua", "Requirements.lua", "Area.lua", "Tracker.lua"):
     load(name)
-lua.globals().LOAD_UI_CORE = lambda: (load("UI.lua"), load("Core.lua"))
+lua.globals().LOAD_UI_CORE = lambda: (load("TrackerUI.lua"), load("UI.lua"), load("Core.lua"))
 lua.execute((root / "tests" / "test_addon.lua").read_text(encoding="utf-8"))
 lua.execute((root / "tests" / "test_catalog.lua").read_text(encoding="utf-8"))
 lua.execute((root / "tests" / "test_area.lua").read_text(encoding="utf-8"))
 lua.execute((root / "tests" / "test_requirements.lua").read_text(encoding="utf-8"))
+for name in ("test_tracker.lua", "test_catalog_regressions.lua", "test_ui_regressions.lua", "test_core_regressions.lua"):
+    test = root / "tests" / name
+    lua.execute(test.read_text(encoding="utf-8"))

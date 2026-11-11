@@ -14,11 +14,15 @@ function A:Context()
     local mapID = self:Call(C_Map, "GetBestMapForUnit", "player")
     local pos = mapID and self:Call(C_Map, "GetPlayerMapPosition", mapID, "player")
     local x, y
-    if pos then x, y = pos:GetXY() end
+    if pos and type(pos.GetXY) == "function" then
+        local ok, px, py = pcall(pos.GetXY, pos)
+        if ok and type(px) == "number" and type(py) == "number"
+            and px >= 0 and px <= 1 and py >= 0 and py <= 1 then x, y = px, py end
+    end
     local aspect = 1
     local w, h
     if mapID then w, h = self:Call(C_Map, "GetMapWorldSize", mapID) end
-    if w and h and h > 0 then aspect = w / h end
+    if type(w) == "number" and type(h) == "number" and w > 0 and h > 0 then aspect = w / h end
     local info = mapID and self:Call(C_Map, "GetMapInfo", mapID)
     return {mapID = mapID, level = UnitLevel("player"), position = {x = x, y = y},
         aspect = aspect, name = info and info.name or "Mapa indisponivel"}
@@ -72,6 +76,8 @@ function A:Collect(context)
             or (tag and groupTags[tag.tagID]) or false
         local settings = self.db.quests[id] or {}
         q.ignored, q.dropRate = settings.ignored, settings.dropRate
+        q.favorite = self.Tracker and self.Tracker:IsFavorite(id) or false
+        q.focused = self.Tracker and self.Tracker:GetFocus() == id or false
         if settings.group ~= nil then q.group = settings.group end
         byID[id] = q
     end
@@ -92,15 +98,19 @@ function A:Collect(context)
     end
     local result = {}
     for _, q in pairs(byID) do result[#result + 1] = q end
+    table.sort(result, function(a,b) return a.id < b.id end)
     return result
 end
 
 function A:Navigate(q)
     if InCombatLockdown() then self:Print("Marque o destino fora de combate."); return end
-    if not q.x or not q.y then self:Print("Missao sem coordenadas fornecidas pelo jogo."); return end
+    if type(q) ~= "table" or type(q.mapID) ~= "number" or q.mapID <= 0
+        or type(q.x) ~= "number" or type(q.y) ~= "number" then
+        self:Print("Missao sem coordenadas fornecidas pelo jogo."); return
+    end
     local x, y = q.x, q.y
-    if x < 0 or x > 1 or y < 0 or y > 1 then return end
-    if C_Map and C_Map.SetUserWaypoint and UiMapPoint then
+    if x ~= x or y ~= y or x < 0 or x > 1 or y < 0 or y > 1 then return end
+    if C_Map and C_Map.SetUserWaypoint and UiMapPoint and type(UiMapPoint.CreateFromCoordinates) == "function" then
         local ok, err = pcall(function()
             C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(q.mapID, x, y))
             if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then

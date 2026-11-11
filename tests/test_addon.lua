@@ -162,6 +162,7 @@ test("addon initializes, registers command and renders real UI code",function()
     events.scripts.OnEvent(events,"ADDON_LOADED","ForeverQuestRoute")
     assert(A.ready and SlashCmdList.FOREVERQUESTROUTE and #UISpecialFrames==1)
     A.view.tab="route"
+    A.frame:Show()
     A:Refresh(); assert(not A.lastError and #A.route==2)
     assert(A.rows[1].title.text and A.summary.text:find("Zona de teste",1,true))
 end)

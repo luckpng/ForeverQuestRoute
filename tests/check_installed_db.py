@@ -51,7 +51,7 @@ def convert(value):
 
 schemas = {}
 for entity in ("Quest", "Npc", "Item", "Object"):
-    schema = lua.execute((provider_path / f"src/meta/{entity.lower()}Meta.lua").read_text(), "QuestieDB", provider)
+    schema = lua.execute((provider_path / f"src/meta/{entity.lower()}Meta.lua").read_text(encoding="utf-8-sig"), "QuestieDB", provider)
     schemas[entity] = schema
 
 
@@ -106,7 +106,7 @@ LibQuestieDB.Enum={raceMaskById={[1]=1},classKeys={WARRIOR=1}}
 for file in ("dungeons.lua", "areaIdToUiMapId.lua"):
     lua.execute((provider_path / "support/Forever/Zones" / file).read_text(encoding="utf-8-sig"))
 for file in ("Engine.lua", "Adapter.lua", "Catalog.lua", "Requirements.lua", "Area.lua"):
-    lua.execute((root / "ForeverQuestRoute" / file).read_text(), "ForeverQuestRoute", addon)
+    lua.execute((root / "ForeverQuestRoute" / file).read_text(encoding="utf-8-sig"), "ForeverQuestRoute", addon)
 lua.execute('''
 A.Catalog:Start(); DRAIN(); A.Catalog:SyncCharacter()
 assert(A.Catalog.ready, A.Catalog.message)
