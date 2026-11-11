@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: Forever Quest Route
+## Notes: Planejador de quests e dungeons, requisitos e progresso do personagem.
+## Author: Forever Quest Route contributors
+## Version: 0.3.1
+## OptionalDeps: QuestieDB, Questie
+## SavedVariables: ForeverQuestRouteDB
+
+Engine.lua
+Adapter.lua
+Catalog.lua
+Requirements.lua
+Area.lua
+UI.lua
+Core.lua

@@ -1,0 +1,26 @@
+# Dados locais do jogo
+WTF/
+SavedVariables/
+Screenshots/
+Logs/
+Cache/
+
+# Ferramentas e arquivos locais
+.tools/
+.research/
+.env
+.env.*
+*.pem
+*.key
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+*.log
+*.bak
+*backup*
+*.zip
+dist/

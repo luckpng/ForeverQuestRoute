@@ -1,0 +1,144 @@
+FOREVER QUEST ROUTE — 0.3.1
+
+Planejador de quests e dungeons para WoW Forever (Interface 16001).
+
+COMECE AQUI
+Digite /reload se estiver atualizando a versao anterior. Depois use /fqr.
+O addon abre na aba Area atual; aguarde a indexacao inicial do QuestieDB.
+
+ABAS
+Area atual: lista as quests da zona em que o personagem esta, incluindo as
+concluidas antes da instalacao. Exibe concluidas/total, porcentagem e quantas
+faltam, separando em andamento, prontas para entregar, bloqueadas e outras
+pendencias. Busca e filtro Status afetam a lista, nunca o total da area.
+Atualiza ao mudar de zona ou entregar quests. Use Status: Concluidas para
+ver as que ja entregou e Status: Pendentes para ver o que falta.
+
+O total considera sua raca/classe, em todos os niveis. Repetiveis e quests
+de dungeon ficam fora por padrao, com opcoes para incluir. Alternativas
+exclusivas ja bloqueadas por outra escolha e quests acima do nivel maximo
+permitido ficam fora do total; faltas de nivel minimo/pre-requisitos continuam
+visiveis. A zona vem da categoria geografica da quest; sem uma categoria
+geografica mapeada, usa as zonas dos NPCs/objetos que a oferecem.
+O total e uma estimativa do catalogo, nao um criterio oficial do jogo para
+concluir uma area. Conteudo removido ou nao catalogado pode afetar o numero.
+
+Dungeons: lista global por instancia, sem precisar visitar sua regiao.
+Escolha a dungeon na coluna da esquerda. O contador mostra concluidas/total
+no recorte de raca/classe; busca, nivel e status filtram a lista central.
+
+Catalogo / Historico: todas as quests conhecidas pelo QuestieDB, incluindo
+missoes de mundo e de dungeon. O botao Status alterna entre Pendentes,
+Todas, Concluidas e Em andamento. Busca aceita parte do nome ou ID.
+
+Recomendadas: rota aproximada para o mapa e nivel atuais. Cruza diario,
+pontos disponibilizados pelo cliente e quests ainda nao aceitas da base.
+Prefere menos esforco e deslocamento, penalizando coleta e grupo. Mostra
+ate 30 etapas. Nao e uma rota global otima nem uma estimativa de XP/h.
+
+DETALHES E ACOES
+Clique numa quest para ver quem a oferece, zona, coordenadas e requisitos.
+Quests bloqueadas mostram Requer diretamente na linha. Passe o mouse para
+ver todos os requisitos ou clique para abrir a lista no quadro de detalhes.
+Cada condicao aparece como [OK], [FALTA] ou [CONFERIR]. Quests anteriores
+mostram nome e ID; alternativas sao ligadas por OU. Profissao, reputacao,
+itens e habilidades especiais mostram os valores conhecidos, sem presumir
+que o personagem os atende quando o addon nao verificou isso.
+Use a rolagem do quadro de detalhes em cadeias longas.
+- Marcar coleta/objetivo/entrega: cria um waypoint para o local conhecido.
+- Entrada dungeon: marca a entrada mesmo estando longe da instancia.
+- Rastrear quest: ativa o rastreamento nativo de uma quest ja aceita.
+- Ver pre-requisito: abre a quest anterior pendente no catalogo.
+Marcar um destino substitui o waypoint manual atual.
+Na aba Recomendadas, Shift+clique ignora uma quest.
+O painel pode ser arrastado e se ajusta ao tamanho da janela do jogo.
+
+STATUS
+Concluida: entregue por este personagem segundo o jogo ou um evento de
+entrega observado pelo addon. Nao usa conclusao de conta/Warband.
+Em andamento: no diario do personagem.
+Entregar: objetivos completos, ainda nao entregue.
+Pendente: nao concluida; requisitos conhecidos atendidos.
+Bloqueada: falta nivel, quest anterior ou outra condicao conhecida.
+Ver requisitos: faltam validar profissao, reputacao, itens ou condicoes
+especiais. Nao e anunciada como disponivel.
+Sem status: o cliente nao forneceu uma resposta de conclusao.
+
+O filtro Pendentes inclui bloqueadas, requisitos especiais e status
+desconhecido. Use Minha raca/classe para ocultar outras variantes. Meu nivel
+aplica a faixa configurada, inicialmente 7 niveis abaixo e 2 acima.
+Por padrao Dungeons mostra todas as faixas de nivel.
+
+BASE DE DADOS
+O catalogo global usa a API publica do QuestieDB, contrato 4. Mantenha
+QuestieDB ativado e instalado separadamente.
+Questie e opcional, mas suas correcoes tambem podem melhorar os dados.
+Sem QuestieDB, permanece a rota local limitada ao que o cliente expuser.
+O addon nao altera arquivos, tabelas nem preferencias do Questie.
+
+Dungeon e associada pela zona da quest ou inferida de criaturas, objetos,
+fontes dos itens e quest givers dentro da instancia. A origem desse vinculo
+aparece nos detalhes. Essa inferencia pode incluir quests que tambem possam
+ser feitas fora da dungeon. Entradas e coordenadas sao fornecidas pela base.
+Raides/campos de batalha conhecidos nao entram na lista de dungeons.
+
+O catalogo nao garante conter todo o conteudo do servidor. Pode incluir
+quests antigas/removidas; pendente nao significa disponivel para aceitar.
+Ainda podem existir requisitos nao modelados. Nao valida automaticamente
+profissao, reputacao, itens, eventos, fase ou conteudo removido do servidor.
+Conclusao de quests repetiveis depende dos flags que o cliente mantem.
+
+Taxas de drop nao sao inventadas. Objetivos de itens podem representar
+coleta no chao ou loot de criaturas. Quando nao ha taxa manual, o addon
+informa drop desconhecido. A dificuldade usa nivel, tags de grupo e elites;
+nao mede seu equipamento, classe, talentos ou habilidade de combate.
+A rota por coordenadas nao conhece montanhas, cavernas, agua ou portais.
+
+COMANDOS
+/fqr                         Abre/fecha o painel (Esc tambem fecha).
+/fqr area                    Abre progresso e quests da area atual.
+/fqr dungeons                Abre o planejador global de dungeons.
+/fqr historico               Abre o catalogo e historico.
+/fqr rota                    Abre recomendacoes para o mapa atual.
+/fqr proxima                 Marca a primeira etapa da rota atual.
+/fqr atualizar               Recalcula os dados e solicita o mapa.
+/fqr nivel 7 2               Configura faixa abaixo/acima do seu nivel.
+/fqr ignorar ID              Ignora a quest na rota.
+/fqr restaurar ID            Restaura a quest na rota.
+/fqr drop ID 35              Informa drop de 35% para objetivos de itens.
+/fqr drop ID limpar          Remove a taxa informada.
+/fqr grupo ID sim|nao|limpar  Ajusta classificacao de grupo na rota.
+/fqr diagnostico             Mostra build, catalogo e erros de API.
+/fqr ajuda                   Lista os comandos.
+
+Preferencias sao salvas pelo jogo. O historico de entregas observado pelo
+addon fica separado pelo GUID de cada personagem, sem misturar alts.
+Missoes concluidas antes de instalar sao consultadas pelas APIs do jogo.
+A indexacao e feita em lotes e aguarda o fim de combate.
+
+INSTALACAO
+Extraia ForeverQuestRoute em Interface\AddOns do cliente Forever.
+Caminho esperado: AddOns\ForeverQuestRoute\ForeverQuestRoute.toc.
+Ative Forever Quest Route e QuestieDB na tela de addons. Em uma primeira
+instalacao reinicie o cliente; em atualizacoes da mesma pasta use /reload.
+O script AjustarInterface.ps1 permite ajustar somente o numero do manifesto
+caso o build mude. Confira com /run print(GetBuildInfo()). Alterar o numero
+nao adapta APIs nem garante compatibilidade com outro cliente.
+
+VALIDACAO DESTA VERSAO
+50 testes de Lua 5.1 com APIs simuladas: motor, filtros, painel, comandos,
+catalogo, requisitos AND/OR, personagens separados e entrega de quests.
+A interface ainda precisa de validacao visual dentro do jogo.
+Nenhum teste foi executado no servidor.
+
+Para repetir os testes do ZIP de fontes:
+  python -m pip install lupa cbor2
+  python tests/run_tests.py
+  python tests/check_installed_db.py "CAMINHO\Interface\AddOns\QuestieDB"
+
+FONTES TECNICAS
+API publica e tipos do QuestieDB instalado, versao 1.0.12 / contrato 4.
+https://github.com/Questie/QuestieDB
+APIs C_QuestLog, C_QuestLine e C_Map do cliente atual:
+https://github.com/Gethe/wow-ui-source/tree/live/Interface/AddOns/Blizzard_APIDocumentationGenerated
+O QuestieDB e consumido em tempo de execucao; nao esta incluido neste ZIP.
