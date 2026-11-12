@@ -1,4 +1,4 @@
-FOREVER QUEST ROUTE — 0.4.0
+FOREVER QUEST ROUTE — 0.4.1
 
 Tracker e planejador de quests para WoW Forever (Interface 16001).
 
@@ -10,6 +10,9 @@ TRACKER COMPACTO
 Mostra quatro quests por página com objetivos, progresso e estado de entrega.
 A roda do mouse e os botões inferiores percorrem todas as páginas.
 Clique numa quest para focá-la e marcar o próximo destino conhecido.
+Sem um destino conhecido, o clique abre os detalhes sem avisos repetidos.
+Quando falta o waypoint do jogo, o addon consulta marcadores do mapa e
+locais aproximados do objetivo no QuestieDB, identificados nos detalhes.
 Botão direito abre exatamente essa quest no diário completo.
 Shift+clique adiciona ou remove um favorito.
 Arraste pelo cabeçalho; use Travar para fixar a posição ou o X para ocultar.
@@ -121,7 +124,7 @@ não implementa telemetria ou envio desses dados para serviços externos.
 A base de dados e os saves dos jogadores não acompanham a distribuição.
 
 VALIDAÇÃO
-101 testes automatizados em Lua 5.1 com APIs simuladas cobrem tracker,
+107 testes automatizados em Lua 5.1 com APIs simuladas cobrem tracker,
 objetivos em combate, navegação, filtros, requisitos e personagens separados.
 A interface ainda precisa de validação visual dentro do cliente Forever.
 Para testes e montagem do ZIP, consulte o README do repositório.

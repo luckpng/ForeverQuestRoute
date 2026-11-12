@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.4.1
+
+- Clique no tracker consulta waypoints específicos e marcadores do mapa quando falta o waypoint principal.
+- Objetivos pendentes podem usar locais aproximados de criaturas, objetos e fontes de itens do QuestieDB; entregas usam o receptor conhecido.
+- Quando não há destino conhecido, o clique abre a quest no diário sem repetir avisos no chat.
+- Locais aproximados são identificados nos detalhes; objetivos concluídos e associações ambíguas não geram destinos.
+
 ## 0.4.0
 
 - Tracker compacto com objetivos, barras de progresso, paginação, foco, favoritos e posição por personagem.

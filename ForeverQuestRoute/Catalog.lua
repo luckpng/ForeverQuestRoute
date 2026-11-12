@@ -387,6 +387,59 @@ function C:Location(q, finish, preferredMap)
     return #pieces>0 and table.concat(pieces,"\n") or "Origem nao informada pela base",point
 end
 
+-- Use matching unfinished objective groups, never the quest giver, as a
+-- fallback for clients without native objective waypoints. Spawns are an
+-- approximate destination; scripted/event objectives remain without a pin.
+function C:ObjectiveLocation(q,objectives,context)
+    if not self.provider then return nil end
+    local kinds={monster=1,object=2,item=3}
+    local counts,indices={},{}
+    for _,objective in ipairs(objectives) do
+        if kinds[objective.type] then counts[objective.type]=(counts[objective.type] or 0)+1 end
+    end
+    local best,bestScore
+    local function consider(entityName,id)
+        local entity=self.provider[entityName]
+        local spawns=self:Read(entity,id,"spawns") or {}
+        local areas={}; for area in pairs(spawns) do areas[#areas+1]=area end; table.sort(areas)
+        for _,area in ipairs(areas) do
+            local map=self:MapForArea(area)
+            if map then
+                for _,xy in ipairs(spawns[area]) do
+                    local x,y=xy[1],xy[2]
+                    if type(x)=="number" and type(y)=="number" and x>=0 and x<=100 and y>=0 and y<=100 then
+                        local candidate={mapID=map,x=x/100,y=y/100,title=q.title,
+                            source="Local aproximado do objetivo (QuestieDB)"}
+                        local same=context.mapID==map
+                        local distance=same and A.Engine.Distance(context.position,candidate,context.aspect) or nil
+                        local score=(same and 0 or 10)+(distance or 0)
+                        if not bestScore or score<bestScore then best,bestScore=candidate,score end
+                    end
+                end
+            end
+        end
+    end
+    for _,objective in ipairs(objectives) do
+        local kind=kinds[objective.type]
+        if kind then
+            indices[objective.type]=(indices[objective.type] or 0)+1
+            local group=(q.rawObjectives or {})[kind] or {}
+            -- Different objective counts cannot be mapped safely by position.
+            local raw=counts[objective.type]==#group and group[indices[objective.type]]
+            if raw and not objective.finished then
+                if kind==1 then consider("Npc",raw[1])
+                elseif kind==2 then consider("Object",raw[1])
+                else
+                    for _,source in ipairs({{"npcDrops","Npc"},{"objectDrops","Object"}}) do
+                        for _,id in ipairs(self:Read(self.provider.Item,raw[1],source[1]) or {}) do consider(source[2],id) end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
 function C:View(level, filters)
     self:BeginView()
     local rows,counts={}, {done=0,pending=0,active=0,total=0}

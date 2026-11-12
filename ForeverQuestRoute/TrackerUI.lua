@@ -127,11 +127,11 @@ function A:CreateTrackerUI()
             end
             self.Tracker:SetFocus(entry.quest.id)
             self.trackerPage = 1
-            if mouse == "RightButton" then
+            local destination=mouse~="RightButton" and self.Tracker:ResolveDestination(entry,self.context)
+            if mouse == "RightButton" or not destination then
                 if self.OpenJournalQuest then self:OpenJournalQuest(entry.quest.id)
                 else self:SelectTab("tracker"); self.selected = entry; self:Render(); self.frame:Show() end
-            elseif entry.point then self:Navigate(entry.point)
-            else self:Print("Objetivo sem coordenadas. Abra o diario para conferir os detalhes.") end
+            else self:Navigate(destination) end
             if self.Refresh then self:Refresh() else self:RenderTracker() end
         end)
         row:SetScript("OnEnter", function(button)
@@ -142,7 +142,8 @@ function A:CreateTrackerUI()
             for _, objective in ipairs(entry.quest.objectives) do
                 GameTooltip:AddLine((objective.finished and "[OK] " or "[ ] ") .. objective.text, 1, 1, 1, true)
             end
-            GameTooltip:AddLine("Clique: focar e marcar destino. Botao direito: detalhes.", .7, .7, .7, true)
+            GameTooltip:AddLine("Clique: focar e marcar destino; sem local conhecido, abre detalhes.", .7, .7, .7, true)
+            GameTooltip:AddLine("Botao direito: detalhes.", .7, .7, .7, true)
             GameTooltip:AddLine("Shift+clique: alternar favorito.", .7, .7, .7, true); GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)

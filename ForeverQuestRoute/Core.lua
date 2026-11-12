@@ -1,6 +1,6 @@
 local addonName, A = ...
 A.route = {}
-A.version = "0.4.0"
+A.version = "0.4.1"
 
 local function finite(value)
     return type(value)=="number" and value==value and value~=math.huge and value~=-math.huge

@@ -94,6 +94,51 @@ function T:SetTracked(id, tracked)
     return true
 end
 
+local function point(map,x,y,title,source)
+    map,x,y=number(map),number(x),number(y)
+    if not map or map<=0 or map%1~=0 or not x or not y or x<0 or x>1 or y<0 or y>1 then return nil end
+    return {mapID=map,x=x,y=y,title=title,source=source}
+end
+
+-- Some Forever quests expose a map POI but no global next waypoint.
+function T:Destination(id,complete,context)
+    context=context or {}
+    local title=A:Call(C_QuestLog,"GetTitleForQuestID",id) or ("Quest #" .. id)
+    local map,x,y=A:Call(C_QuestLog,"GetNextWaypoint",id)
+    local destination=point(map,x,y,title,"Destino do jogo")
+    if destination then return destination end
+    if context.mapID then
+        x,y=A:Call(C_QuestLog,"GetNextWaypointForMap",id,context.mapID)
+        destination=point(context.mapID,x,y,title,"Destino do mapa")
+        if destination then return destination end
+        for _,poi in ipairs(A:Call(C_QuestLog,"GetQuestsOnMap",context.mapID) or {}) do
+            if poi.questID==id and not poi.isHidden then
+                destination=point(context.mapID,poi.x,poi.y,title,"Marcador do mapa")
+                if destination then return destination end
+            end
+        end
+    end
+    local record=A.Catalog and A.Catalog.byID[id]
+    if complete and record then
+        local _,delivery=A.Catalog:Location(record,true,context.mapID)
+        if delivery then delivery.source="Entrega conhecida pelo QuestieDB"; return delivery end
+    end
+end
+
+-- Questie spawn lookup is intentionally on demand, not on every HUD refresh.
+function T:ResolveDestination(entry,context)
+    if not entry or not entry.quest then return nil end
+    local q=entry.quest
+    local complete=A:Call(C_QuestLog,"IsComplete",q.id)==true or q.complete
+    local destination=self:Destination(q.id,complete,context)
+    if destination then destination.title=q.title; return destination end
+    if complete then return nil end
+    local record=A.Catalog and A.Catalog.byID[q.id]
+    if record and A.Catalog.ObjectiveLocation then
+        return A.Catalog:ObjectiveLocation(record,q.objectives or {},context or {})
+    end
+end
+
 -- Unlike the route, the journal keeps accepted quests from every map visible.
 function T:Snapshot(context)
     context = context or {}
@@ -107,12 +152,8 @@ function T:Snapshot(context)
             local id = log.questID
             seen[id] = true
             local objectives, progress = self:Objectives(id)
-            local map, x, y = A:Call(C_QuestLog, "GetNextWaypoint", id)
-            map, x, y = number(map), number(x), number(y)
-            local point
-            if map and map > 0 and x and y and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
-                point = {mapID=map, x=x, y=y, title=log.title or ("Quest #" .. id)}
-            end
+            local point=self:Destination(id,progress.complete,context)
+            local map=point and point.mapID
             local mapInfo = map and A:Call(C_Map, "GetMapInfo", map)
             local q = {id=id, title=log.title or A:Call(C_QuestLog, "GetTitleForQuestID", id) or ("Quest #" .. id),
                 level=log.difficultyLevel or log.level, accepted=true, complete=progress.complete,

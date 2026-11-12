@@ -134,7 +134,8 @@ test("compact tracker paginates all quests and supports focus, destination and l
     A.Refresh=function() refreshes=true end
     local first=A.trackerRows[1].entry
     A.trackerRows[1].scripts.OnClick(A.trackerRows[1],"LeftButton")
-    assert(T:GetFocus()==first.quest.id and marked==first.point and refreshes and A.trackerPage==1)
+    assert(T:GetFocus()==first.quest.id and marked.mapID==first.point.mapID and marked.x==first.point.x
+        and marked.y==first.point.y and refreshes and A.trackerPage==1)
     local reveal,oldOpen=A.OpenJournalQuest,A.OpenJournalQuest
     A.OpenJournalQuest=function(_,id) reveal=id; return true end
     A.trackerRows[1].scripts.OnClick(A.trackerRows[1],"RightButton"); assert(reveal==first.quest.id)
@@ -179,6 +180,78 @@ test("temporarily hidden parent UI does not disable the compact tracker preferen
     frame:Hide(); frame.scripts.OnHide(frame)
     assert(not A.db.options.trackerVisible)
 end)
+test("missing global waypoint falls back to the map specific waypoint",function()
+    local global,localMap=C_QuestLog.GetNextWaypoint,C_QuestLog.GetNextWaypointForMap
+    C_QuestLog.GetNextWaypoint=function() end
+    C_QuestLog.GetNextWaypointForMap=function(id,map) assert(id==1 and map==10); return .2,.3 end
+    local destination=T:Destination(1,false,{mapID=10})
+    assert(destination.mapID==10 and destination.x==.2 and destination.y==.3)
+    C_QuestLog.GetNextWaypoint=global; C_QuestLog.GetNextWaypointForMap=localMap
+end)
+
+test("missing waypoints use only the matching visible quest map marker",function()
+    local global,pois=C_QuestLog.GetNextWaypoint,C_QuestLog.GetQuestsOnMap
+    C_QuestLog.GetNextWaypoint=function() end
+    C_QuestLog.GetQuestsOnMap=function() return {{questID=2,x=.1,y=.1},{questID=1,x=.2,y=.2,isHidden=true},{questID=1,x=.6,y=.7}} end
+    local destination=T:Destination(1,false,{mapID=10})
+    assert(destination.x==.6 and destination.y==.7)
+    C_QuestLog.GetNextWaypoint=global; C_QuestLog.GetQuestsOnMap=pois
+end)
+
+test("delivery without a native waypoint uses the known receiver",function()
+    local global,location,record=C_QuestLog.GetNextWaypoint,A.Catalog.Location,A.Catalog.byID[3]
+    C_QuestLog.GetNextWaypoint=function() end
+    A.Catalog.byID[3]={id=3}
+    A.Catalog.Location=function(_,q,finish,map) assert(q.id==3 and finish and map==10); return "Receiver",{mapID=10,x=.8,y=.9} end
+    local destination=T:Destination(3,true,{mapID=10})
+    assert(destination.x==.8 and destination.source:find("Entrega",1,true))
+    C_QuestLog.GetNextWaypoint=global; A.Catalog.Location=location; A.Catalog.byID[3]=record
+end)
+
+test("Questie objective fallback skips finished objectives and chooses a nearby pending spawn",function()
+    local C=A.Catalog; local provider,maps=C.provider,C.areaMaps
+    C.areaMaps={[12]=10,[13]=20}
+    C.provider={Npc={spawns=function(id)
+        if id==100 then return {[12]={{40,40}}} end
+        return {[12]={{80,80},{42,40}},[13]={{1,1}}}
+    end}}
+    local q={id=1,title="Pending objective",rawObjectives={{{100},{101}}}}
+    local destination=C:ObjectiveLocation(q,{{type="monster",finished=true},{type="monster",finished=false}},
+        {mapID=10,position={x=.4,y=.4}})
+    assert(destination.mapID==10 and destination.x==.42 and destination.y==.4)
+    assert(destination.source:find("aproximado",1,true))
+    assert(not C:ObjectiveLocation(q,{{type="monster",finished=false}},{}))
+    assert(not C:ObjectiveLocation(q,{{type="event",finished=false}},{}))
+    C.provider=provider; C.areaMaps=maps
+end)
+
+test("item objective fallback uses the known drop source",function()
+    local C=A.Catalog; local provider,maps=C.provider,C.areaMaps
+    C.areaMaps={[12]=10}
+    C.provider={Item={npcDrops=function() return {100} end},Npc={spawns=function() return {[12]={{30,40}}} end}}
+    local destination=C:ObjectiveLocation({title="Item quest",rawObjectives={[3]={{900}}}},
+        {{type="item",finished=false}},{mapID=10})
+    assert(destination and destination.x==.3 and destination.y==.4)
+    C.provider=provider; C.areaMaps=maps
+end)
+
+test("clicking a quest without any known location opens its details without chat spam",function()
+    local global=C_QuestLog.GetNextWaypoint
+    local open,refresh,printMessage,navigate=A.OpenJournalQuest,A.Refresh,A.Print,A.Navigate
+    C_QuestLog.GetNextWaypoint=function() end
+    local opened
+    A.OpenJournalQuest=function(_,id) opened=id end
+    A.Refresh=function() end
+    A.Print=function() error("Unwanted chat warning") end
+    A.Navigate=function() error("Unknown location must not navigate") end
+    local row=A.trackerRows[1]; local entry=row.entry
+    row.entry={quest={id=4444,title="Scripted quest",objectives={}}}
+    row.scripts.OnClick(row,"LeftButton"); assert(opened==4444)
+    opened=nil; row.scripts.OnClick(row,"LeftButton"); assert(opened==4444)
+    row.entry=entry; C_QuestLog.GetNextWaypoint=global
+    A.OpenJournalQuest=open; A.Refresh=refresh; A.Print=printMessage; A.Navigate=navigate
+end)
+
 A.db=saved.db; C_QuestLog=saved.log; C_Map=saved.map; UnitGUID=saved.guid
 InCombatLockdown=saved.combat; Enum=saved.enum
 print("TOTAL " .. passes .. " tracker tests passed")

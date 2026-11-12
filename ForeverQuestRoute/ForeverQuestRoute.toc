@@ -2,7 +2,7 @@
 ## Title: Forever Quest Route
 ## Notes: Tracker de objetivos, diario, rotas, dungeons e progresso por personagem.
 ## Author: Forever Quest Route contributors
-## Version: 0.4.0
+## Version: 0.4.1
 ## OptionalDeps: QuestieDB, Questie
 ## SavedVariables: ForeverQuestRouteDB
 

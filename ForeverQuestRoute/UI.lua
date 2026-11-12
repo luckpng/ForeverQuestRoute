@@ -287,7 +287,17 @@ function A:ShowDetails(entry)
             entry.point={mapID=map,x=x,y=y,title=q.title}
         elseif q.mapID and q.x and q.y then entry.point=q
         elseif delivery then entry.point=delivery end
+        if not entry.point and self.Tracker and self.Tracker.ResolveDestination then
+            local objectives=self.Tracker:Objectives(q.id)
+            entry.point=self.Tracker:ResolveDestination({quest={id=q.id,title=q.title,
+                complete=entry.state=="turnin",objectives=objectives}},self.context)
+        end
         self.giverButton:SetText(entry.state=="turnin" and "Marcar entrega" or "Marcar objetivo")
+    end
+    if entry.point and entry.point.source then
+        pieces[#pieces+1]=entry.point.source
+        self.detailBody:SetText(table.concat(pieces,"\n"))
+        self.detailContent:SetHeight(math.max(96,self.detailBody:GetStringHeight()+8))
     end
     self.giverButton:SetEnabled(entry.point and entry.point.mapID and entry.point.x and entry.point.y and true or false)
     self.entranceButton:SetEnabled(self.Catalog:Entrance(entry.dungeon)~=nil)
